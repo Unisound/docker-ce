@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/docker/docker/api/server/httputils"
@@ -464,6 +465,31 @@ func (s *containerRouter) postContainersCreate(ctx context.Context, w http.Respo
 	if hostConfig != nil && versions.LessThan(version, "1.25") {
 		hostConfig.AutoRemove = false
 	}
+	// ---------------- Security -----------------
+	envVars := config.Env
+	security := GetEnvValue("ENABLE_SECURITY", envVars)
+	if security == "" {
+		security = "TRUE"
+	}
+	sec, _ := strconv.ParseBool(security)
+	if sec {
+		currentUser := GetEnvValue("CURRENT_USER", envVars)
+		currentUserGids := GetEnvValue("CURRENT_USER_GIDS", envVars)
+		if strings.Contains(currentUser, ":") {
+			userGid := strings.SplitN(currentUser, ":", 2)[1]
+			strings.Replace(currentUserGids, userGid, "", -1)
+		}
+		config.User = currentUser
+		hostConfig.GroupAdd = strings.Split(currentUserGids, ",")
+
+		SecurityOptVars := hostConfig.SecurityOpt
+		SecurityOptVars = DeleteSecurityOpt("label=disable", SecurityOptVars)
+		SecurityOptVars = append(SecurityOptVars, "no-new-privileges")
+
+		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, SecurityOptVars...)
+		hostConfig.Privileged = false
+	}
+	// ------------------ END ------------------------
 
 	ccr, err := s.backend.ContainerCreate(types.ContainerCreateConfig{
 		Name:             name,
@@ -477,6 +503,26 @@ func (s *containerRouter) postContainersCreate(ctx context.Context, w http.Respo
 	}
 
 	return httputils.WriteJSON(w, http.StatusCreated, ccr)
+}
+
+func GetEnvValue(key string, envArray []string) string {
+	for _, entry := range envArray {
+		parts := strings.SplitN(entry, "=", 2)
+		if parts[0] == key {
+			return parts[1]
+		}
+	}
+	return ""
+}
+
+func DeleteSecurityOpt(key string, opts []string) []string {
+	for i, k := range opts {
+		if k == key {
+			opts = append(opts[:i], opts[i+1:]...)
+			return opts
+		}
+	}
+	return opts
 }
 
 func (s *containerRouter) deleteContainers(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {

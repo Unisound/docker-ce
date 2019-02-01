@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
+	"strings"
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
@@ -164,6 +166,19 @@ func createContainer(ctx context.Context, dockerCli command.Cli, containerConfig
 	hostConfig := containerConfig.HostConfig
 	networkingConfig := containerConfig.NetworkingConfig
 	stderr := dockerCli.Err()
+
+	u, err := user.Current()
+	if err != nil {
+		fmt.Fprintf(stderr, "WARNING: %s\n", err)
+	} else {
+		gids, err := u.GroupIds()
+		if err != nil {
+			fmt.Fprintf(stderr, "WARNING: %s\n", err)
+		}
+		atlasEnv := []string{}
+		atlasEnv = append(atlasEnv, "CURRENT_USER="+u.Uid+":"+u.Gid, "CURRENT_USER_GIDS="+strings.Join(gids, ","))
+		config.Env = append(config.Env, atlasEnv...)
+	}
 
 	var (
 		trustedRef reference.Canonical
