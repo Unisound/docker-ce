@@ -488,6 +488,8 @@ func (s *containerRouter) postContainersCreate(ctx context.Context, w http.Respo
 
 		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, SecurityOptVars...)
 		hostConfig.Privileged = false
+		hostConfig.CapAdd = []string{} // clear ALL caps which added in command line by user
+		//hostConfig.CapDrop = []string{"ALL"}  // drop ALL caps which are enabled by default
 	}
 	// ------------------ END ------------------------
 
