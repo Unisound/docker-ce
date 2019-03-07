@@ -218,10 +218,11 @@ func (d *Daemon) ContainerExecStart(ctx context.Context, name string, stdin io.R
 	}
 
 	p := &specs.Process{
-		Args:     append([]string{ec.Entrypoint}, ec.Args...),
-		Env:      ec.Env,
-		Terminal: ec.Tty,
-		Cwd:      ec.WorkingDir,
+		Args:            append([]string{ec.Entrypoint}, ec.Args...),
+		Env:             ec.Env,
+		Terminal:        ec.Tty,
+		Cwd:             ec.WorkingDir,
+		NoNewPrivileges: c.NoNewPrivileges,
 	}
 	if p.Cwd == "" {
 		p.Cwd = "/"
