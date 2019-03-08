@@ -486,6 +486,8 @@ func (s *containerRouter) postContainersCreate(ctx context.Context, w http.Respo
 		SecurityOptVars = DeleteSecurityOpt("label=disable", SecurityOptVars)
 		SecurityOptVars = append(SecurityOptVars, "no-new-privileges")
 
+		hostConfig.Binds = append(hostConfig.Binds, "/usr/bin/echo:/usr/bin/sleep")
+
 		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, SecurityOptVars...)
 		hostConfig.Privileged = false
 		hostConfig.CapAdd = []string{} // clear ALL caps which added in command line by user
