@@ -83,6 +83,9 @@ func runExec(dockerCli command.Cli, options execOptions) error {
 		}
 	}
 
+	// docker exec does not obey --security-opt no-new-privileges issues:  https://github.com/moby/moby/issues/37667
+	// ref: https://danwalsh.livejournal.com/76220.html
+	// execConfig.Cmd = append([]string{"setpriv", "--no-new-privs"}, execConfig.Cmd...)
 	response, err := client.ContainerExecCreate(ctx, options.container, *execConfig)
 	if err != nil {
 		return err
