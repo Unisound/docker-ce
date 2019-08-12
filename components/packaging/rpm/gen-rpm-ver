@@ -10,7 +10,7 @@ if [[ $(uname) -eq "Darwin" ]]; then
     DATE_COMMAND="docker run --rm alpine date"
 fi
 
-GIT_COMMAND="git -C $ENGINE_DIR"
+GIT_COMMAND="git -c $ENGINE_DIR"
 origVersion="$VERSION"
 rpmVersion="$VERSION"
 rpmRelease=3

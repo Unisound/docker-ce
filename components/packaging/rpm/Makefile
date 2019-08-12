@@ -58,7 +58,7 @@ clean: ## remove build artifacts
 	$(MAKE) -C ../image clean
 
 .PHONY: rpm
-rpm: fedora centos ## build all rpm packages
+rpm: centos ##fedora centos ## build all rpm packages
 
 .PHONY: fedora
 fedora: fedora-31 fedora-30 fedora-29 fedora-28 ## build all fedora rpm packages
