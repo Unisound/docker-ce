@@ -234,6 +234,7 @@ func (d *Daemon) ContainerExecStart(ctx context.Context, name string, stdin io.R
 	p.Env = ec.Env
 	p.Cwd = ec.WorkingDir
 	p.Terminal = ec.Tty
+	p.NoNewPrivileges = c.NoNewPrivileges
 
 	if p.Cwd == "" {
 		p.Cwd = "/"
