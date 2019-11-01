@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -125,6 +126,26 @@ func (d *Daemon) ContainerExecCreate(name string, config *types.ExecConfig) (str
 	execConfig.User = config.User
 	execConfig.WorkingDir = config.WorkingDir
 
+	// ---------------- Security -----------------
+	envVars := config.Env
+	security := GetEnvValue("ENABLE_SECURITY", envVars)
+	if security == "" {
+		security = "TRUE"
+	}
+	sec, _ := strconv.ParseBool(security)
+	if sec {
+		currentUser := GetEnvValue("CURRENT_USER", envVars)
+		currentUserGids := GetEnvValue("CURRENT_USER_GIDS", envVars)
+		if strings.Contains(currentUser, ":") {
+			userGid := strings.SplitN(currentUser, ":", 2)[1]
+			strings.Replace(currentUserGids, userGid, "", -1)
+		}
+		execConfig.User = currentUser
+		execConfig.Privileged = false
+		cntr.HostConfig.GroupAdd = strings.Split(currentUserGids, ",")
+	}
+	// ------------------ END ------------------------
+
 	linkedEnv, err := d.setupLinkedContainers(cntr)
 	if err != nil {
 		return "", err
@@ -236,6 +257,43 @@ func (d *Daemon) ContainerExecStart(ctx context.Context, name string, stdin io.R
 	p.Terminal = ec.Tty
 	p.NoNewPrivileges = c.NoNewPrivileges
 
+	// ---------------- Security -----------------
+	envVars := ec.Env
+	security := GetEnvValue("ENABLE_SECURITY", envVars)
+	if security == "" {
+		security = "TRUE"
+	}
+	sec, _ := strconv.ParseBool(security)
+	if sec {
+		currentUser := GetEnvValue("CURRENT_USER", envVars)
+		currentUserGids := GetEnvValue("CURRENT_USER_GIDS", envVars)
+		if strings.Contains(currentUser, ":") {
+			userUid := strings.SplitN(currentUser, ":", 2)[0]
+			userGid := strings.SplitN(currentUser, ":", 2)[1]
+			uid, err := strconv.ParseUint(userUid, 10, 32)
+			if err != nil {
+				return err
+			}
+			p.User.UID = uint32(uid)
+			gid, err := strconv.ParseUint(userGid, 10, 32)
+			if err != nil {
+				return err
+			}
+			p.User.GID = uint32(gid)
+			strings.Replace(currentUserGids, userGid, "", -1)
+		}
+		gids := []uint32{}
+		for _, i := range strings.Split(currentUserGids, ",") {
+			j, err := strconv.ParseUint(i, 10, 32)
+			if err != nil {
+				return err
+			}
+			gids = append(gids, uint32(j))
+		}
+		p.User.AdditionalGids = gids
+	}
+	// ------------------ END ------------------------
+
 	if p.Cwd == "" {
 		p.Cwd = "/"
 	}
@@ -334,4 +392,14 @@ func (d *Daemon) containerExecIds() map[string]struct{} {
 		}
 	}
 	return ids
+}
+
+func GetEnvValue(key string, envArray []string) string {
+	for _, entry := range envArray {
+		parts := strings.SplitN(entry, "=", 2)
+		if parts[0] == key {
+			return parts[1]
+		}
+	}
+	return ""
 }

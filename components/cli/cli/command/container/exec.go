@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
+	"os/user"
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
@@ -69,6 +71,21 @@ func runExec(dockerCli command.Cli, options execOptions) error {
 	execConfig := parseExec(options, dockerCli.ConfigFile())
 	ctx := context.Background()
 	client := dockerCli.Client()
+	stderr := dockerCli.Err()
+
+	if userExist := doesEnvExist("CURRENT_USER", execConfig.Env); userExist == false {
+		u, err := user.Current()
+		if err != nil {
+			fmt.Fprintf(stderr, "WARNING: %s\n", err)
+		} else {
+			gids, err := u.GroupIds()
+			if err != nil {
+				fmt.Fprintf(stderr, "WARNING: %s\n", err)
+			}
+			atlasEnv := []string{"CURRENT_USER=" + u.Uid + ":" + u.Gid, "CURRENT_USER_GIDS=" + strings.Join(gids, ",")}
+			execConfig.Env = append(execConfig.Env, atlasEnv...)
+		}
+	}
 
 	// We need to check the tty _before_ we do the ContainerExecCreate, because
 	// otherwise if we error out we will leak execIDs on the server (and
