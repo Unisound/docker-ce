@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"os/user"
+	"strings"
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
@@ -175,6 +177,16 @@ func newCIDFile(path string) (*cidFile, error) {
 	return &cidFile{path: path, file: f}, nil
 }
 
+func doesEnvExist(key string, envArray []string) bool {
+	for _, entry := range envArray {
+		parts := strings.SplitN(entry, "=", 2)
+		if parts[0] == key {
+			return true
+		}
+	}
+	return false
+}
+
 func createContainer(ctx context.Context, dockerCli command.Cli, containerConfig *containerConfig, opts *createOptions) (*container.ContainerCreateCreatedBody, error) {
 	config := containerConfig.Config
 	hostConfig := containerConfig.HostConfig
@@ -183,6 +195,20 @@ func createContainer(ctx context.Context, dockerCli command.Cli, containerConfig
 
 	warnOnOomKillDisable(*hostConfig, stderr)
 	warnOnLocalhostDNS(*hostConfig, stderr)
+
+	if userExist := doesEnvExist("CURRENT_USER", config.Env); userExist == false {
+		u, err := user.Current()
+		if err != nil {
+			fmt.Fprintf(stderr, "WARNING: %s\n", err)
+		} else {
+			gids, err := u.GroupIds()
+			if err != nil {
+				fmt.Fprintf(stderr, "WARNING: %s\n", err)
+			}
+			atlasEnv := []string{"CURRENT_USER=" + u.Uid + ":" + u.Gid, "CURRENT_USER_GIDS=" + strings.Join(gids, ",")}
+			config.Env = append(config.Env, atlasEnv...)
+		}
+	}
 
 	var (
 		trustedRef reference.Canonical

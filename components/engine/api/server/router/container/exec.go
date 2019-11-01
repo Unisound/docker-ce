@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/docker/docker/api/server/httputils"
 	"github.com/docker/docker/api/types"
@@ -49,6 +50,18 @@ func (s *containerRouter) postContainerExecCreate(ctx context.Context, w http.Re
 			return errdefs.InvalidParameter(errors.New("got EOF while reading request body"))
 		}
 		return errdefs.InvalidParameter(err)
+	}
+
+	envVars := execConfig.Env
+	security := GetEnvValue("ENABLE_SECURITY", envVars)
+	if security == "" {
+		security = "TRUE"
+	}
+	sec,_ := strconv.ParseBool(security)
+	if sec {
+		currentUser := GetEnvValue("CURRENT_USER", envVars)
+		execConfig.User = currentUser
+		execConfig.Privileged = false
 	}
 
 	if len(execConfig.Cmd) == 0 {
