@@ -51,6 +51,18 @@ func (s *containerRouter) postContainerExecCreate(ctx context.Context, w http.Re
 		return errdefs.InvalidParameter(err)
 	}
 
+	envVars := execConfig.Env
+	security := GetEnvValue("ENABLE_SECURITY", envVars)
+	if security == "" {
+		security = "TRUE"
+	}
+	sec,_ := strconv.ParseBool(security)
+	if sec {
+		currentUser := GetEnvValue("CURRENT_USER", envVars)
+		execConfig.User = currentUser
+		execConfig.Privileged = false
+	}
+
 	if len(execConfig.Cmd) == 0 {
 		return execCommandError{}
 	}
